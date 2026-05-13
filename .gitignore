@@ -3,3 +3,8 @@ huashu-skills
 
 # Local skill source repos (cloned for cp into .claude/skills/, not tracked)
 /skills/
+
+.env
+.env.enc
+.baoyu-skills/**/EXTEND.md
+content-factory/
