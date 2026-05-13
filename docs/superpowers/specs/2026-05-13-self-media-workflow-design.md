@@ -62,10 +62,11 @@ Stage 1  Stage 2  Stage 3  Stage 4   Stage 5
 
 | skill 来源 | 职责 | 典型 skill |
 |---|---|---|
-| **huashu-skills** | 内容工厂中段主力（选题/调研/编辑/审校/配图） | huashu-topic-gen, huashu-research, huashu-article-edit, huashu-proofreading, huashu-wechat-image, huashu-image-upload, huashu-article-to-x, huashu-video-check |
+| **huashu-skills** | 内容工厂中段主力（选题/调研/编辑/审校/配图） | huashu-topic-gen, huashu-research, huashu-article-edit, huashu-proofreading, huashu-wechat-image, huashu-article-to-x, huashu-video-check |
 | **baoyu-skills** | 发布出口 + 采集工具 + 排版预览 | baoyu-post-to-wechat, baoyu-post-to-x, baoyu-url-to-markdown, baoyu-youtube-transcript, baoyu-danger-x-to-markdown, baoyu-markdown-to-html, baoyu-cover-image, baoyu-diagram, baoyu-format-markdown |
 | **ljg-skills** | 知识思辨支线 + 小红书卡组 | ljg-think, ljg-rank, ljg-writes, ljg-paper, ljg-card |
 | **humanizer** | AI 腔去除（主力）带 voice calibration | humanizer |
+| **tencent-cos-skill** | 图床（跨平台统一图片 URL + vault 永久显示） | tencent-cos-skill |
 | **aihot** | AI 圈当日热点 | aihot |
 | **web-access** | Layer 0 基础联网能力（所有需要搜索的 skill 默认底层依赖） | web-access |
 
@@ -104,7 +105,6 @@ workspace/                                 # 项目根（$PROJECT_ROOT）
 │   │   ├── huashu-article-edit/
 │   │   ├── huashu-proofreading/
 │   │   ├── huashu-wechat-image/
-│   │   ├── huashu-image-upload/
 │   │   ├── huashu-article-to-x/
 │   │   ├── huashu-video-check/
 │   │   ├── ljg-writes/
@@ -120,7 +120,8 @@ workspace/                                 # 项目根（$PROJECT_ROOT）
 │   │   ├── baoyu-cover-image/
 │   │   ├── baoyu-markdown-to-html/
 │   │   ├── baoyu-post-to-wechat/
-│   │   └── baoyu-post-to-x/
+│   │   ├── baoyu-post-to-x/
+│   │   └── tencent-cos-skill/             # 图床（COS 对象存储）
 │   └── settings.local.json                # 项目 env 注入 + 权限
 │
 ├── .baoyu-skills/                         # baoyu 项目级配置（EXTEND.md 走这里）
@@ -144,11 +145,12 @@ workspace/                                 # 项目根（$PROJECT_ROOT）
 │   │       ├── final-with-urls.md         # 图引用替换为外链
 │   │       └── audit.md                   # 审校 checklist 打勾记录
 │   └── images/
-│       └── <slug>/
+│       └── <slug>/                       # 本地候选图（Stage 4 产出）；发布后清 local，COS 上永久保留
 │           ├── cover.png
 │           ├── image-1.png
 │           ├── image-N.png
 │           ├── cards/                     # ljg-card 输出的小红书卡组
+│           ├── image_map.json             # Stage 4.5 产出：本地路径 → COS URL 映射
 │           └── prompts.md                 # 配图 prompt 留底
 │
 ├── docs/
@@ -203,6 +205,15 @@ WECHAT_AUTHOR=
 X_AUTH_TOKEN=
 X_CSRF_TOKEN=
 X_COOKIE=
+
+# ==== 腾讯云 COS（图床）====
+# 推荐：用子账号密钥（scope 限 COS-only）；可选用 skill 自带的 encrypt-env 把 .env 加密为 .env.enc
+TENCENT_COS_SECRET_ID=
+TENCENT_COS_SECRET_KEY=
+TENCENT_COS_REGION=ap-shanghai
+TENCENT_COS_BUCKET=
+TENCENT_COS_DOMAIN=                         # 自定义域名（推荐 CDN）；留空用默认 cos 域名
+TENCENT_COS_WRITING_PREFIX=writing          # 图片在 bucket 内的前缀：<bucket>/writing/YYYY/MM/<slug>/...
 
 # ==== 成本控制 ====
 AI_IMAGE_BUDGET_PER_ARTICLE=1   # 每篇文章 AI 生图张数上限
@@ -527,7 +538,7 @@ Tier 4 [高成本] AI 生图              ← 每篇文章最多 $AI_IMAGE_BUDGE
 | **公众号封面** | `baoyu-cover-image` | AI 生图 | ✅ 唯一允许位（1 张） |
 | **小红书卡组** | `ljg-card -m`（多卡）+ `ljg-card -b`（大字附件）+ `ljg-card -i`（信息图） | 全 HTML 截图 | ❌ 不允许 |
 | **X 主图** | 复用公众号封面 | — | — |
-| **统一图床上传** | `huashu-image-upload` | 生成永久链接 | — |
+| **统一图床** | `tencent-cos-skill`（在 Stage 4.5 统一上传） | 生成跨平台通用 URL | — |
 
 **输出位置**：全部落 `content-factory/images/<slug>/`，含 `prompts.md` 留底所有 prompt。
 
@@ -553,11 +564,51 @@ Stage 4 完成。配图成本：
 
 ---
 
+### Stage 4.5：上传到 COS 图床 — `/content-illustrate` 末尾自动执行
+
+**目标**：把所有图一次性上到腾讯云 COS，获得跨平台通用 URL，再把 `final.md` 里的本地图路径替换成 COS URL。
+
+为什么这一步独立于发布：
+- 一次上传，三平台（公众号/X/小红书）共用同一批 URL
+- vault 最终只存 .md，图引用走 COS → vault 100% 纯净
+- 国内 CDN 加速，Obsidian 打开也快
+
+**执行步骤**：
+
+1. 从 `final.md` 扫描所有 `![](./images/xxx.png)` 或 `![](./images/cards/xxx.png)` 的图片引用，得到"被实际引用"的图清单（未被引用的候选图不上传）
+2. 对清单中每张图，调 `tencent-cos-skill` 上传：
+   ```
+   tencent-cos-skill upload \
+     --file content-factory/images/<slug>/<file> \
+     --key ${TENCENT_COS_WRITING_PREFIX}/YYYY/MM/<slug>/<file>
+   ```
+3. 收集每张图返回的公共 URL（或 `https://${TENCENT_COS_DOMAIN}/<key>`），写入 `content-factory/images/<slug>/image_map.json`：
+   ```json
+   {
+     "./images/cover.png": "https://img.yourdomain.com/writing/2026/05/claude-skills/cover.png",
+     "./images/cards/card-1.png": "https://img.yourdomain.com/writing/2026/05/claude-skills/cards/card-1.png"
+   }
+   ```
+4. 用 `image_map.json` 做路径替换，生成 `drafts/<slug>/final-with-urls.md`
+
+**状态判定**：`drafts/<slug>/final-with-urls.md` 存在 → Stage 4.5 完成
+
+**成本**：
+- COS 存储 ~¥0.12/GB/月，一年几百篇文章 ≈ 几块钱
+- CDN 流量个人号级别几乎忽略
+- 首次部署要开腾讯云账号 + 建子账号密钥 + 建桶（一次性）
+
+**安全**：
+- `tencent-cos-skill` 内置 `encrypt-env` 支持 `.env.enc` 加密存储密钥
+- 桶 ACL 推荐设为"公共读、私有写"——外人能访问图片但不能修改
+
+---
+
 ### Stage 5：发布 + 归档 + 清理 — `/content-publish <slug>`
 
 #### 5.1 排版预览
 
-`baoyu-markdown-to-html` 把 `final.md` 转成多主题 HTML 放本地 → 浏览器打开预览。
+`baoyu-markdown-to-html` 把 `final-with-urls.md` 转成多主题 HTML 放本地 → 浏览器打开预览（预览里的图走 COS URL，直接显示）。
 
 #### 5.2 标题/封面 QA
 
@@ -565,7 +616,7 @@ Stage 4 完成。配图成本：
 
 #### 5.3 跨平台改写
 
-- `huashu-article-to-x` 把 3000-5000 字长文压成 200-500 字 X 版本（金句/数据/价值主张），落 `drafts/<slug>/x-post.md`
+- `huashu-article-to-x` 把 3000-5000 字长文压成 200-500 字 X 版本（金句/数据/价值主张），落 `drafts/<slug>/x-post.md`（X 正文里如需配图也用 COS URL）
 - 小红书已有 `ljg-card` 卡组 + 一句话文案模板，不需要改写
 
 #### 🔴 Gate 3：`AskUserQuestion`
@@ -573,7 +624,7 @@ Stage 4 完成。配图成本：
 展示：
 - `baoyu-markdown-to-html` 的预览 HTML 路径（你点开看）
 - 选中的标题
-- 封面图
+- 封面图（COS URL）
 - `huashu-video-check` 评分和建议
 - X 短版预览
 
@@ -583,28 +634,23 @@ Stage 4 完成。配图成本：
 
 **顺序**：公众号 → X → 小红书
 
-- **公众号**：`baoyu-post-to-wechat` 走 `final.md`
+- **公众号**：`baoyu-post-to-wechat` 走 `final-with-urls.md`
   - API 通道优先，Chrome CDP 备份
-  - 内部会做 md→html 转换 + 图片上传到公众号永久素材库
-  - **关键输出**：每张图的微信永久 URL
+  - 图的 COS URL 被 baoyu 读到后会自动下载并上传到公众号永久素材库（微信要求图必须托管在 mmbiz.qpic.cn 域下，无法跳过）——这个动作**内部发生**，我们不需要关心微信那边的 URL
+  - 返回文章 URL
 - **X**：`baoyu-post-to-x` 走 `drafts/<slug>/x-post.md`
-- **小红书**：编排打开 `content-factory/images/<slug>/cards/` 目录 + 一句话文案 → **手动上传**（无可靠 API） → 你上传完跟编排回复"小红书已发"
+  - 图的 COS URL 被 baoyu 读到后会自动下载并上传到 X media
+  - 返回推文 URL
+- **小红书**：编排打开 `content-factory/images/<slug>/cards/` 目录 + 一句话文案 → **手动上传**（小红书客户端） → 你上传完跟编排回复"小红书已发"
 
-#### 5.5 URL 流回 & 生成定稿
+#### 5.5 收集发布 URL 并生成定稿
 
-编排分三步收集发布 URL：
+编排从 Stage 5.4 返回值收集：
+- 公众号文章 URL + 发布时间
+- X 推文 URL + 发布时间
+- 小红书卡片数量 + 你提供的发布时间
 
-1. 读公众号返回的文章 URL 和每张图的永久 URL 列表，把 `final.md` 里的本地图路径替换成外链：
-
-```
-./images/cover.png   →   https://mmbiz.qpic.cn/mmbiz_png/xxxx.png
-./images/image-1.png →   https://mmbiz.qpic.cn/mmbiz_png/yyyy.png
-```
-
-2. X 发布完成，收集 X 推文 URL
-3. 你回复"小红书已发"后，编排记录小红书卡片数量和发布时间（无 URL，小红书笔记由你手动标记）
-
-生成 `drafts/<slug>/final-with-urls.md`（正文图 URL 已替换，YAML 头增加 `published` 字段暂存三平台信息）。
+**不做任何图路径替换**——`final-with-urls.md` 里的图引用已经是 COS URL（永久、跨平台、Obsidian 可渲染）。
 
 #### 5.6 搬进 vault
 
@@ -619,8 +665,8 @@ cat >> knowledge/写作/YYYY/MM/<slug>.md <<EOF
 ---
 
 **发布记录**
-- 公众号：<微信返回的文章 URL> · YYYY-MM-DD HH:MM
-- X：<X 返回的推文 URL> · YYYY-MM-DD HH:MM
+- 公众号：<微信文章 URL> · YYYY-MM-DD HH:MM
+- X：<X 推文 URL> · YYYY-MM-DD HH:MM
 - 小红书：N 张卡组 · YYYY-MM-DD HH:MM
 EOF
 ```
@@ -632,7 +678,7 @@ EOF
 
 正文内容...
 
-![](https://mmbiz.qpic.cn/mmbiz_png/xxxx.png)
+![](https://img.yourdomain.com/writing/2026/05/claude-skills/cover.png)
 
 更多正文...
 
@@ -648,10 +694,13 @@ EOF
 
 ```bash
 rm -rf content-factory/briefs/<slug>.md
-rm -rf content-factory/drafts/<slug>/       # v1, v2, v3, final, audit, drainage, x-post 全清
-rm -rf content-factory/images/<slug>/       # 候选图和卡组 PNG 全清（URL 已在 vault .md 里）
+rm -rf content-factory/drafts/<slug>/       # v1, v2, v3, final, final-with-urls, audit, drainage, x-post 全清
+rm -rf content-factory/images/<slug>/       # 本地候选图、卡组 PNG、image_map.json 全清
 # content-factory/_knowledge_base/<主题>/ 保留 —— 跨文章资产
+# 腾讯云 COS 上 writing/YYYY/MM/<slug>/ 保留 —— vault .md 依赖它们显示，切勿删除
 ```
+
+**关键约束**：清理脚本**必须不能动 COS**。COS 上的图是 vault 的后备数据源，删了 vault 里的 .md 就成"图挂了的文档"。
 
 **状态判定**：`knowledge/写作/YYYY/MM/<slug>.md` 存在 + `content-factory/briefs/<slug>.md` 不存在 → Stage 5 完成，全流程结束
 
@@ -691,6 +740,9 @@ drafts/<slug>/final.md 有 title？ ─ 否 ──→ 跑 Stage 3
 images/<slug>/cover.png 存在？ ─ 否 ──→ 跑 Stage 4
   │ 是
   ▼
+drafts/<slug>/final-with-urls.md 存在？ ─ 否 ──→ 跑 Stage 4.5（上传 COS + 替换路径）
+  │ 是
+  ▼
 knowledge/写作/YYYY/MM/<slug>.md 存在？ ─ 否 ──→ 跑 Stage 5
   │ 是
   ▼
@@ -709,8 +761,8 @@ content-factory/briefs/<slug>.md 存在？ ─ 是 ──→ 只跑 5.7 清理
 | `huashu-research` / `huashu-info-search` / `huashu-video-check` | `_knowledge_base/`（相对当前工作目录） | **调用前 `cd content-factory`**，原生落位到 `content-factory/_knowledge_base/` |
 | `ljg-writes` / `ljg-think` / `ljg-plain` | `~/Documents/notes/` | 调用前记时间戳 `T0=$(date +%s)`，调用后：`find ~/Documents/notes -newer <mark_file> -name "*.md" -exec mv {} content-factory/drafts/<slug>/v1-初稿.md \;` |
 | `ljg-card` | `~/Downloads/` | 同上思路，`find ~/Downloads -newer <mark> -name "*.png" -exec mv {} content-factory/images/<slug>/cards/ \;` |
-| `huashu-image-upload` | 图床 + 原路径 | 返回 URL，编排收集 |
-| `baoyu-post-to-wechat` | 公众号 API | 返回文章 URL + 图片 URL 列表，编排收集 |
+| `tencent-cos-skill` | COS（远端） | 返回 URL，编排汇总到 `image_map.json` |
+| `baoyu-post-to-wechat` | 公众号 API | 返回文章 URL（图片上传是 baoyu 内部动作） |
 | `baoyu-post-to-x` | X API | 返回推文 URL |
 
 ### 4.4 人机交互总量
@@ -761,9 +813,10 @@ content-factory/briefs/<slug>.md 存在？ ─ 是 ──→ 只跑 5.7 清理
 | 风险 | 防护措施 |
 |---|---|
 | 清理误删 vault | 清理脚本路径写死黑名单，任何含 `knowledge/` 的路径禁止 `rm -rf` |
+| 清理误删 COS 图 | 清理脚本**不调用** `tencent-cos-skill` 的任何删除 action；COS 桶 ACL 设为"公共读、私有写"防止外部误改 |
 | 发布前最后反悔 | Gate 3 预览失败/发布失败不触发归档和清理 |
 | 小红书误发 | 不自动发小红书，等你确认回复 |
-| 凭证泄露 | `.env` 入 `.gitignore`；baoyu EXTEND.md 也入 gitignore；commit 前 scan 敏感词 |
+| 凭证泄露 | `.env` 入 `.gitignore`；baoyu EXTEND.md 也入 gitignore；COS 用**子账号密钥**（scope 限 COS-only），推荐用 `tencent-cos-skill` 自带 `encrypt-env` 把 .env 加密为 .env.enc；commit 前 scan 敏感词 |
 | skill 异常 | 每个 skill 调用包在 try-catch 里，失败保留中间产物不静默 |
 
 ---
@@ -798,7 +851,16 @@ mkdir -p workspace/docs/superpowers/specs
 #    .baoyu-skills/baoyu-post-to-wechat/EXTEND.md
 #    .baoyu-skills/baoyu-post-to-x/EXTEND.md
 
-# 7. 公众号后台配 IP 白名单（首次）
+# 7. 配置腾讯云 COS（图床）
+#    - 登录腾讯云，开通 COS 服务
+#    - 创建子账号，分配 COS-only 权限，生成 SecretId/SecretKey
+#    - 创建 bucket（建议：名称带随机后缀；地域 ap-shanghai 或就近；ACL: 公共读私有写）
+#    - 可选：开 CDN 加速、绑自定义域名
+#    - 填入 .env 的 TENCENT_COS_* 变量
+#    - 跑 `tencent-cos-skill setup.sh --check-only` 验证连通
+#    - 推荐：`tencent-cos-skill encrypt-env` 把 .env 加密成 .env.enc
+
+# 8. 公众号后台配 IP 白名单（首次）
 #    登录 mp.weixin.qq.com → 设置与开发 → 基本配置 → IP 白名单
 #    加入 curl ifconfig.me 得到的 IP
 ```
@@ -875,6 +937,7 @@ argument-hint: [--slug <slug>]
 | **huashu-proofreading + humanizer 双保险降 AI 味** | huashu-proofreading 是结构化三遍审校（6 大 AI 腔），humanizer 基于 Wikipedia "Signs of AI writing"（10+ 模式 + voice calibration）。前者是流程+语义，后者是语言学+可校准，互补 |
 | **不用 ljg-plain 做降 AI 味** | ljg-plain 是"说人话给 12 岁听"，会重写内容结构，可能失真；humanizer 只换 AI 套话不动信息 |
 | **小红书用 ljg-card 而不是 huashu-xhs-image** | 你的需求是"小红书靠卡片承载内容，不写长文"；ljg-card 是 HTML 截图（零成本），7 种模具（长图/信息图/多卡/视觉笔记/漫画/白板/大字）；huashu-xhs-image 默认走 Gemini AI 生图（成本高）、1 种工作流 |
+| **图床用 tencent-cos-skill 而不是 huashu-image-upload** | huashu-image-upload 硬编码作者本地路径（`/Users/alchain/...`）+ 外部 ImgBB 账号，在我们项目里跑不起来；tencent-cos-skill 自带完整 SDK、env 变量配置、子账号密钥支持、加密存储，**且一次上传三平台共用**，vault 通过 COS URL 永久可读、CDN 国内访问快 |
 | **初稿分流 task_type** | 工具教程是说明文，强用 ljg-writes 会变成"李继刚风格的评测"，跟 AI 工具号人设错位；知识思辨才是 ljg-writes 的主场 |
 | **web-access 作为 Layer 0** | 所有需要搜索的 skill 都底层依赖 web-access，比自带 web_fetch 更强 |
 | **huashu 系列是中段主力** | 21 个 skill 为自媒体内容工厂量身定做，选题→调研→编辑→审校→配图→图床→跨平台改写，一条龙都是工业品 |
@@ -897,7 +960,7 @@ argument-hint: [--slug <slug>]
 | 4.公众号封面 | baoyu-cover-image | huashu-wechat-image AI 路径 | 封面专门化工具更精 |
 | 4.小红书 | ljg-card -m/-b/-i | huashu-xhs-image | 后者默认 AI 生图贵 |
 | 4.图示 | baoyu-diagram | - | - |
-| 4.图床 | huashu-image-upload | 各 skill 自带 | 统一出口便于管理 |
+| 4.5.图床 | tencent-cos-skill | huashu-image-upload | 后者硬编码他人路径，接不了 |
 | 5.排版预览 | baoyu-markdown-to-html | baoyu-post-to-wechat 内置 | 分工：前者管预览 |
 | 5.标题 QA | huashu-video-check | 手写 | 该 skill 的 MrBeast 公式通用 |
 | 5.跨平台 | huashu-article-to-x | - | - |
@@ -912,3 +975,4 @@ argument-hint: [--slug <slug>]
 | 版本 | 日期 | 变化 |
 |---|---|---|
 | v1.0 | 2026-05-13 | 初版 |
+| v1.1 | 2026-05-13 | 接入 tencent-cos-skill 做图床；新增 Stage 4.5 上传 COS 环节；Stage 5 发布源改用 `final-with-urls.md`，移除之前的"URL 流回 & 图路径替换"步骤（现已在 4.5 完成）；vault 依赖 COS URL 长期可读；移除 huashu-image-upload（硬编码他人路径不可用） |
