@@ -8,3 +8,4 @@ huashu-skills
 .env.enc
 .baoyu-skills/**/EXTEND.md
 content-factory/
+.claude/skills/ljg-card/node_modules/
