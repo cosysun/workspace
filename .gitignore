@@ -1,6 +1,9 @@
 .baoyu-skills/.env
 huashu-skills
 
+# macOS
+.DS_Store
+
 # Local skill source repos (cloned for cp into .claude/skills/, not tracked)
 /skills/
 
@@ -15,3 +18,6 @@ content-factory/
 .claude/skills/tencent-cos-skill/package.json
 .claude/skills/tencent-cos-skill/package-lock.json
 .claude/skills/tencent-cos-skill/.gitignore
+
+# baoyu-post-to-x runtime artifacts (created by bun install)
+.claude/skills/baoyu-post-to-x/scripts/node_modules/
