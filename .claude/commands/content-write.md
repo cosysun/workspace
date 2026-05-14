@@ -9,6 +9,23 @@ argument-hint: <slug>
 
 `<slug>` → 读 `content-factory/briefs/<slug>.md`（含调研摘要 + 大纲 + task_type）。
 
+## 字数约束（贯穿全 Stage）
+
+从 brief 读 `公众号预计字数` 字段，解析出 `WORD_MIN` / `WORD_MAX`：
+
+```bash
+# 解析示例：字段值 "1000-1500（默认...）" → WORD_MIN=1000, WORD_MAX=1500
+RANGE=$(grep '公众号预计字数' content-factory/briefs/<slug>.md | grep -oE '[0-9]+-[0-9]+' | head -1)
+WORD_MIN=${RANGE%-*}
+WORD_MAX=${RANGE#*-}
+# 兜底：解析失败默认 1000-1500
+WORD_MIN=${WORD_MIN:-1000}
+WORD_MAX=${WORD_MAX:-1500}
+WORD_HARD_CAP=$((WORD_MAX * 12 / 10))   # 上限的 +20% 是绝对红线
+```
+
+**这两个数后面所有步骤都要用**：3.1 写作时当目标，3.2/3.3 审校时不许涨过 `WORD_HARD_CAP`，3.4.5 强制收口到 [WORD_MIN, WORD_MAX]。
+
 ## 准备工作
 
 ```bash
@@ -28,11 +45,17 @@ cp content-factory/_templates/audit-checklist.md content-factory/drafts/<slug>/a
 
 Claude 直接按 brief 大纲写说明文，落 `content-factory/drafts/<slug>/v1-初稿.md`。
 
+**字数目标**：`[WORD_MIN, WORD_MAX]` 字（中文字符数，不含 markdown 标记）。写完后用 `wc -m` 或 `grep -oE '[\x{4e00}-\x{9fff}]' | wc -l` 自查，超出 `WORD_HARD_CAP` 直接重写。
+
 **不要**调 `ljg-writes` —— 文体不匹配，会变成"大朝风格的评测"。
 
 #### 3.1.b 如果 task_type=`知识思辨`
 
-调 `ljg-writes`（输出到 `~/Documents/notes/{时间戳}__write.md`）。**调用前后做适配层搬运**：
+调 `ljg-writes`（输出到 `~/Documents/notes/{时间戳}__write.md`）。**调用前在 prompt 里把字数范围塞进去**：
+
+> "本次写作字数严格控制在 `WORD_MIN`-`WORD_MAX` 字（即使 ljg-writes 默认 1000-1500，也以 brief 为准）。"
+
+**调用前后做适配层搬运**：
 
 ```bash
 # 调用前打时间标记
@@ -100,6 +123,24 @@ Claude 跑 Chad Nauseam 5 技巧：
 再调 `baoyu-format-markdown` 做标点排版统一。
 
 落 `content-factory/drafts/<slug>/final.md`，audit.md 第三遍打勾。
+
+### 3.4.5 字数收口（强制）
+
+写完 final.md 后立刻量字数：
+
+```bash
+COUNT=$(grep -oE '[\x{4e00}-\x{9fff}]' content-factory/drafts/<slug>/final.md | wc -l | tr -d ' ')
+echo "当前 $COUNT 字 / 目标 $WORD_MIN-$WORD_MAX 字 / 红线 $WORD_HARD_CAP 字"
+```
+
+判断分支：
+
+- **$WORD_MIN ≤ COUNT ≤ $WORD_MAX**：通过，进 3.5
+- **$WORD_MAX < COUNT ≤ $WORD_HARD_CAP**：软超，可接受，但记一笔到 audit.md
+- **COUNT > $WORD_HARD_CAP**：硬超，**必须砍**。调 `huashu-article-edit`，prompt：
+  > "当前 N 字，目标 X-Y 字。砍掉重复论证、冗余例子、套话过渡，保留所有事实和原文核心。砍后报字数。"
+  砍完覆盖 final.md，再量一次。砍 2 轮还超 → 停下来告诉用户哪几段建议手动删
+- **COUNT < $WORD_MIN**：太短，反向：调 `huashu-article-edit` 让它在最薄弱的论证段加例子或具体数字（不要灌水），不许低于 `WORD_MIN`
 
 ### 3.5 三轮标题拟定
 
