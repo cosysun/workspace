@@ -9,3 +9,9 @@ huashu-skills
 .baoyu-skills/**/EXTEND.md
 content-factory/
 .claude/skills/ljg-card/node_modules/
+
+# tencent-cos-skill runtime artifacts (created by setup.sh --persist)
+.claude/skills/tencent-cos-skill/node_modules/
+.claude/skills/tencent-cos-skill/package.json
+.claude/skills/tencent-cos-skill/package-lock.json
+.claude/skills/tencent-cos-skill/.gitignore
