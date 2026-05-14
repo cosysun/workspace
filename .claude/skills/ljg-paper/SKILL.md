@@ -21,7 +21,7 @@ version: "4.9.0"
 
 ## 格式约束
 
-### Org-mode 语法
+### Markdown 语法
 
 - 加粗用 `*bold*`（单星号），禁止 `**bold**`
 - 标题层级从 `*` 开始，不跳级
@@ -32,13 +32,13 @@ version: "4.9.0"
 
 ### 模板权威性
 
-输出结构依据 `references/template.org`。禁止参考 `~/Documents/notes/` 中已有论文文件的章节结构——旧文件可能使用过期模板。
+输出结构依据 `references/template.md`。禁止参考 `~/Documents/notes/` 中已有论文文件的章节结构——旧文件可能使用过期模板。
 
 ### Denote 文件规范
 
 - 时间戳：`date +%Y%m%dT%H%M%S`
 - 可读时间：`date "+%Y-%m-%d %a %H:%M"`
-- 文件名：`{时间戳}--paper-{简短标题}__paper.org`
+- 文件名：`{时间戳}--paper-{简短标题}__paper.md`
 - 输出目录：`~/Documents/notes/`
 
 ### Org 文件头
@@ -288,7 +288,7 @@ title 是这篇笔记的*灵魂句*——读者扫一眼就知道这篇论文带
 
 ### 9. 生成 Org 文件
 
-按 Denote 规范获取时间戳，读 `references/template.org`，写入 `~/Documents/notes/`。
+按 Denote 规范获取时间戳，读 `references/template.md`，写入 `~/Documents/notes/`。
 
 ## 验收
 
