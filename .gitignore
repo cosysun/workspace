@@ -1,5 +1,6 @@
 .baoyu-skills/.env
 huashu-skills
+.playwright-mcp
 
 # macOS
 .DS_Store

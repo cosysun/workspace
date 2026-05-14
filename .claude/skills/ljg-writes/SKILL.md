@@ -36,7 +36,7 @@ version: "6.3.0"
 #+date:       [{YYYY-MM-DD Day HH:MM}]
 #+filetags:   :write:
 #+identifier: {YYYYMMDDTHHMMSS}
-#+author:     李继刚
+#+author:     大朝
 ```
 
 ## 姿态

@@ -28,7 +28,7 @@ cp content-factory/_templates/audit-checklist.md content-factory/drafts/<slug>/a
 
 Claude 直接按 brief 大纲写说明文，落 `content-factory/drafts/<slug>/v1-初稿.md`。
 
-**不要**调 `ljg-writes` —— 文体不匹配，会变成"李继刚风格的评测"。
+**不要**调 `ljg-writes` —— 文体不匹配，会变成"大朝风格的评测"。
 
 #### 3.1.b 如果 task_type=`知识思辨`
 

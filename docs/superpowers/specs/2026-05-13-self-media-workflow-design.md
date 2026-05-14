@@ -938,7 +938,7 @@ argument-hint: [--slug <slug>]
 | **不用 ljg-plain 做降 AI 味** | ljg-plain 是"说人话给 12 岁听"，会重写内容结构，可能失真；humanizer 只换 AI 套话不动信息 |
 | **小红书用 ljg-card 而不是 huashu-xhs-image** | 你的需求是"小红书靠卡片承载内容，不写长文"；ljg-card 是 HTML 截图（零成本），7 种模具（长图/信息图/多卡/视觉笔记/漫画/白板/大字）；huashu-xhs-image 默认走 Gemini AI 生图（成本高）、1 种工作流 |
 | **图床用 tencent-cos-skill 而不是 huashu-image-upload** | huashu-image-upload 硬编码作者本地路径（`/Users/alchain/...`）+ 外部 ImgBB 账号，在我们项目里跑不起来；tencent-cos-skill 自带完整 SDK、env 变量配置、子账号密钥支持、加密存储，**且一次上传三平台共用**，vault 通过 COS URL 永久可读、CDN 国内访问快 |
-| **初稿分流 task_type** | 工具教程是说明文，强用 ljg-writes 会变成"李继刚风格的评测"，跟 AI 工具号人设错位；知识思辨才是 ljg-writes 的主场 |
+| **初稿分流 task_type** | 工具教程是说明文，强用 ljg-writes 会变成"大朝风格的评测"，跟 AI 工具号人设错位；知识思辨才是 ljg-writes 的主场 |
 | **web-access 作为 Layer 0** | 所有需要搜索的 skill 都底层依赖 web-access，比自带 web_fetch 更强 |
 | **huashu 系列是中段主力** | 21 个 skill 为自媒体内容工厂量身定做，选题→调研→编辑→审校→配图→图床→跨平台改写，一条龙都是工业品 |
 
