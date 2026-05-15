@@ -1,2 +1,27 @@
 .baoyu-skills/.env
 huashu-skills
+.playwright-mcp
+
+# macOS
+.DS_Store
+
+# Local skill source repos (cloned for cp into .claude/skills/, not tracked)
+/skills/
+
+.env
+.env.enc
+.baoyu-skills/**/EXTEND.md
+content-factory/
+.claude/skills/ljg-card/node_modules/
+
+# tencent-cos-skill runtime artifacts (created by setup.sh --persist)
+.claude/skills/tencent-cos-skill/node_modules/
+.claude/skills/tencent-cos-skill/package.json
+.claude/skills/tencent-cos-skill/package-lock.json
+.claude/skills/tencent-cos-skill/.gitignore
+
+# baoyu-post-to-x runtime artifacts (created by bun install)
+.claude/skills/baoyu-post-to-x/scripts/node_modules/
+
+# Obsidian UI state (per-machine, not shared)
+knowledge/.obsidian/workspace.json
