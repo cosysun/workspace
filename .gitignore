@@ -22,3 +22,6 @@ content-factory/
 
 # baoyu-post-to-x runtime artifacts (created by bun install)
 .claude/skills/baoyu-post-to-x/scripts/node_modules/
+
+# Obsidian UI state (per-machine, not shared)
+knowledge/.obsidian/workspace.json
