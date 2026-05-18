@@ -57,14 +57,26 @@ interface ArticleOptions {
   onlyFansCanComment?: number;
 }
 
-const TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token";
-const UPLOAD_BODY_IMG_URL = "https://api.weixin.qq.com/cgi-bin/media/uploadimg";
-const UPLOAD_MATERIAL_URL = "https://api.weixin.qq.com/cgi-bin/material/add_material";
-const DRAFT_URL = "https://api.weixin.qq.com/cgi-bin/draft/add";
+// API base URL - 支持通过 WECHAT_API_BASE 环境变量走自建代理
+// 默认直连 api.weixin.qq.com（需要本机 IP 在公众号白名单）
+// 走代理时格式：WECHAT_API_BASE=https://your-domain.com/wechat
+//             外加 X-Auth-Token header（WECHAT_API_TOKEN 环境变量）
+const API_BASE = process.env.WECHAT_API_BASE || "https://api.weixin.qq.com";
+const API_TOKEN = process.env.WECHAT_API_TOKEN || "";
+
+const TOKEN_URL = `${API_BASE}/cgi-bin/token`;
+const UPLOAD_BODY_IMG_URL = `${API_BASE}/cgi-bin/media/uploadimg`;
+const UPLOAD_MATERIAL_URL = `${API_BASE}/cgi-bin/material/add_material`;
+const DRAFT_URL = `${API_BASE}/cgi-bin/draft/add`;
+
+// 自动注入鉴权 header（仅当走代理时）
+function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return API_TOKEN ? { ...extra, "X-Auth-Token": API_TOKEN } : extra;
+}
 
 async function fetchAccessToken(appId: string, appSecret: string): Promise<string> {
   const url = `${TOKEN_URL}?grant_type=client_credential&appid=${appId}&secret=${appSecret}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: authHeaders() });
   if (!res.ok) {
     throw new Error(`Failed to fetch access token: ${res.status}`);
   }
@@ -227,9 +239,9 @@ async function uploadToWechat(
   const url = `${uploadUrl}?type=image&access_token=${accessToken}`;
   const res = await fetch(url, {
     method: "POST",
-    headers: {
+    headers: authHeaders({
       "Content-Type": `multipart/form-data; boundary=${boundary}`,
-    },
+    }),
     body,
   });
 
@@ -390,9 +402,9 @@ async function publishToDraft(
 
   const res = await fetch(url, {
     method: "POST",
-    headers: {
+    headers: authHeaders({
       "Content-Type": "application/json",
-    },
+    }),
     body: JSON.stringify({ articles: [article] }),
   });
 
