@@ -55,6 +55,12 @@
       "skillPath": "skills/defuddle/SKILL.md",
       "computedHash": "0ed68bc3e818ba0e6b8d192357ea3daaf552a3893f8854e7fd43c06831f91323"
     },
+    "huashu-design": {
+      "source": "alchaincyf/huashu-design",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "e0c29db93b45ee81b1ca5e0781e2b3316596390a7b4d925703b780f46dc60482"
+    },
     "json-canvas": {
       "source": "kepano/obsidian-skills",
       "sourceType": "github",
