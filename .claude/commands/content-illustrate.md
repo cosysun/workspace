@@ -8,10 +8,10 @@ argument-hint: <slug>
 ## 核心约束
 
 ```
-Tier 1 [零成本] HTML 截图       ← 默认优先
-Tier 2 [零成本] 现成公共图片
+Tier 1 [零成本] HTML / SVG 精确信息图  ← 文字、流程、步骤、数据优先
+Tier 2 [零成本] 现成公共图片 / 本地截图
 Tier 3 [零成本] HTML 改稿后复渲染
-Tier 4 [高成本] AI 生图          ← 每篇文章最多 ${AI_IMAGE_BUDGET_PER_ARTICLE:-1} 张
+Tier 4 [高成本] AI 生图                ← 默认只保证封面；正文 AI 图需说明理由并计入预算
 ```
 
 ## 输入
@@ -29,9 +29,26 @@ touch content-factory/images/<slug>/prompts.md
 
 ### 4.1 公众号正文配图
 
-调 `huashu-wechat-image`：**强制走 HTML 截图路径**（skill 双路径里选零成本路径）。AI 生图选项**显式禁用**。
-- 落到 `content-factory/images/<slug>/image-N.png`
-- 每张图的 prompt / HTML 模板 append 到 `prompts.md`
+先读 `huashu-wechat-image/references/article-image-planning.md`，为正文图做规划，不要按 H2 机械插图。
+
+规划时为每张图写清：
+- 位置：放在哪个章节后
+- 任务：建立记忆点 / 解释机制 / 降低阅读阻力 / 补充证据 / 节奏休息
+- 图型：概念图 / 机制图 / 步骤图 / 数据图 / 截图
+- 路径：AI / HTML / SVG / 现成图
+- 风格：内容感知配色，而不是所有科技文都暗色终端
+
+路径选择规则：
+- **概念 / 氛围图**：可用 AI，但正文 AI 图必须说明为什么 HTML / SVG 不能替代，并计入预算。
+- **机制 / 架构图**：优先 `baoyu-diagram` 生成 SVG → PNG，或 HTML 截图。
+- **步骤 / 清单 / 数据图**：优先 HTML 截图，保证文字准确和可复渲染。
+- **真实产品 / 网页界面**：优先现成图、本地截图或公开图片，确认清晰度和版权。
+
+落地要求：
+- 输出到 `content-factory/images/<slug>/image-N.png`
+- 每张图的目的、路径、主题、源 HTML/SVG 或完整 prompt append 到 `prompts.md`
+- 如果正文 AI 图会让 AI 生图数量超过 `${AI_IMAGE_BUDGET_PER_ARTICLE:-1}`，先用 AskUserQuestion 确认是否超额
+- 生成后至少预览每张正文图，检查文字准确、尺寸、深色模式适配和是否与小红书卡组重复过多
 
 ### 4.2 公众号架构图 / 流程图
 
@@ -53,6 +70,26 @@ X 主图复用此 cover。
 - `-b` 大字附件 — 标题 / 金句
 - `-i` 信息图 — 数据 / 流程
 
+生成前必须明确小红书卡组策略：
+
+1. 先根据文章内容选择视觉主题，不要默认暗绿终端。可选方向包括：
+   - CLI / 工程工具：暗绿终端风
+   - AI 产品 / 效率工具：暖纸感或浅色产品风
+   - 研究 / 模型 / 数据：克制浅底和数据标签
+   - 商业 / 趋势 / 创业：商业简报风
+   - 风险 / 安全 / 反思：暗色警示风
+   - 创作 / 内容工具：编辑部纸感
+2. 默认卡组叙事结构：
+   - 封面钩子
+   - 痛点共鸣
+   - 机制解释 / 对比图
+   - 核心能力
+   - 快速上手或使用场景
+   - 适合谁 + 边界提醒
+3. 每组至少有 1 张结构图或对比图，不能只做文字摘要卡。
+4. 卡片文案要重写成适合小红书滑读的短句，不要直接把 `final.md` 分页。
+5. 生成完成后至少检查首图、机制图、步骤图、最后一图，确认标题、命令和英文没有尴尬断行。
+
 ljg-card 默认输出到 `~/Downloads/`。**调用前后做适配层搬运**：
 
 ```bash
@@ -64,11 +101,25 @@ find ~/Downloads -newer "$MARK" -name "*.png" -type f \
 rm "$MARK"
 ```
 
+把小红书卡组的主题选择、卡片结构、源 HTML 或核心 prompt append 到 `content-factory/images/<slug>/prompts.md`，至少包含：
+
+```markdown
+## 小红书卡组
+
+- 输出目录：`cards/`
+- 数量：<N> 张
+- 主题：<主题名>
+- 选择理由：<为什么该主题适合这篇内容>
+- 配色：背景 <HEX> / 强调色 <HEX>
+- 结构：<每张卡一句摘要>
+- 源文件：<如有 HTML 预览文件，写相对路径>
+```
+
 ### 4.5 成本预算检查
 
 数 AI 生图张数：
 ```bash
-AI_COUNT=1  # 通常只有 cover 一张
+AI_COUNT=1  # 至少包含 cover；如正文概念图走 AI，逐张累加
 BUDGET=${AI_IMAGE_BUDGET_PER_ARTICLE:-1}
 if [ "$AI_COUNT" -gt "$BUDGET" ]; then
   # 用 AskUserQuestion 让用户确认超额
