@@ -26,3 +26,5 @@ content-factory/
 
 # Obsidian UI state (per-machine, not shared)
 knowledge/.obsidian/workspace.json
+.agents
+.vscode

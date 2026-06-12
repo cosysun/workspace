@@ -11,12 +11,28 @@ argument-hint: <slug>
 Tier 1 [零成本] HTML / SVG 精确信息图  ← 文字、流程、步骤、数据优先
 Tier 2 [零成本] 现成公共图片 / 本地截图
 Tier 3 [零成本] HTML 改稿后复渲染
-Tier 4 [高成本] AI 生图                ← 默认只保证封面；正文 AI 图需说明理由并计入预算
 ```
+
+**本流程一律走 HTML 路径**：封面、正文配图、流程图全部用 HTML 渲染后截图，不调任何 AI 生图后端（不调 `baoyu-cover-image`、不调 `baoyu-imagine`、不调 `imagegen`）。预算永远是 0。
 
 ## 输入
 
 `<slug>` → 读 `content-factory/drafts/<slug>/final.md` 抓需要配图的位置（标题 / H2 节 / 关键概念 / 流程图位）。
+
+## Stage 4.0 解析目标平台（强制第一步）
+
+从 `content-factory/briefs/<slug>.md` 解析 `目标平台` 字段：
+
+```bash
+BRIEF=content-factory/briefs/<slug>.md
+PLATFORMS_LINE=$(grep -E '^- 目标平台' "$BRIEF" || grep -E '目标平台' "$BRIEF" | head -1)
+
+case "$PLATFORMS_LINE" in *公众号*) WANT_WECHAT=1 ;; *) WANT_WECHAT=0 ;; esac
+case "$PLATFORMS_LINE" in *X*)      WANT_X=1      ;; *) WANT_X=0      ;; esac
+case "$PLATFORMS_LINE" in *小红书*) WANT_XHS=1    ;; *) WANT_XHS=0    ;; esac
+```
+
+后续 4.1-4.4 按这些旗短路：未勾选公众号也跳 4.1/4.2/4.3 主线，未勾选小红书直接跳 4.4。
 
 ## 准备
 
@@ -35,35 +51,44 @@ touch content-factory/images/<slug>/prompts.md
 - 位置：放在哪个章节后
 - 任务：建立记忆点 / 解释机制 / 降低阅读阻力 / 补充证据 / 节奏休息
 - 图型：概念图 / 机制图 / 步骤图 / 数据图 / 截图
-- 路径：AI / HTML / SVG / 现成图
+- 路径：HTML / SVG / 现成图（**禁止 AI 生图**）
 - 风格：内容感知配色，而不是所有科技文都暗色终端
 
-路径选择规则：
-- **概念 / 氛围图**：可用 AI，但正文 AI 图必须说明为什么 HTML / SVG 不能替代，并计入预算。
+路径选择规则（**全部零成本路径**）：
+- **概念 / 氛围图**：HTML + 图形元素（emoji、几何图形、渐变背景）做视觉化，不调 AI。
 - **机制 / 架构图**：优先 `baoyu-diagram` 生成 SVG → PNG，或 HTML 截图。
-- **步骤 / 清单 / 数据图**：优先 HTML 截图，保证文字准确和可复渲染。
-- **真实产品 / 网页界面**：优先现成图、本地截图或公开图片，确认清晰度和版权。
+- **步骤 / 清单 / 数据图**：HTML 截图，保证文字准确和可复渲染。
+- **真实产品 / 网页界面**：现成图、本地截图或公开图片，确认清晰度和版权。
 
 落地要求：
 - 输出到 `content-factory/images/<slug>/image-N.png`
-- 每张图的目的、路径、主题、源 HTML/SVG 或完整 prompt append 到 `prompts.md`
-- 如果正文 AI 图会让 AI 生图数量超过 `${AI_IMAGE_BUDGET_PER_ARTICLE:-1}`，先用 AskUserQuestion 确认是否超额
+- 每张图的目的、路径、主题、源 HTML/SVG append 到 `prompts.md`
 - 生成后至少预览每张正文图，检查文字准确、尺寸、深色模式适配和是否与小红书卡组重复过多
 
 ### 4.2 公众号架构图 / 流程图
 
 如果文章有架构 / 流程内容，调 `baoyu-diagram` 生成 SVG → PNG。零成本。落 `images/<slug>/diagram-N.png`。
 
-### 4.3 公众号封面（唯一允许 AI 生图位）
+### 4.3 公众号封面（HTML 渲染）
 
-调 `baoyu-cover-image`：
-- AI 生图，默认 1 张
-- 落 `content-factory/images/<slug>/cover.png`
-- prompt 留底到 `prompts.md`
+**禁止调 `baoyu-cover-image` / `baoyu-imagine` / `imagegen` 等 AI 生图后端。**
 
-X 主图复用此 cover。
+封面走 HTML 截图路径：
 
-### 4.4 小红书卡组（如目标平台含小红书）
+1. 根据 brief 主题 + final.md 风格，写一份独立的 HTML（含内联 CSS 样式），文件落到 `content-factory/images/<slug>/cover.html`
+2. 设计要点：
+   - 画布尺寸 1200×675（16:9）或 2.35:1（MrBeast 横幅感）
+   - 主标题（来自 final.md YAML 的 title 字段）+ 一行副标题 / 钩子
+   - 配色与文章主题匹配（参考 4.4 的视觉主题选择思路）
+   - 用纯文字 + 几何图形 + emoji + CSS 渐变即可，不用外链图片
+3. 用 puppeteer / playwright 之类的工具截图（如已有 `gstack` 截图能力直接用），落到 `content-factory/images/<slug>/cover.png`
+4. 把 HTML 源文件路径和设计选择 append 到 `prompts.md`
+
+X 主图复用此 cover.png（仅当 `WANT_X=1` 时会被 5.4.b 用到，否则就是公众号专用封面）。
+
+### 4.4 小红书卡组（仅当 `WANT_XHS=1`）
+
+未勾选小红书时整段跳过，不生成 cards/。
 
 调 `ljg-card`，按需要选模具：
 - `-m` 多卡（1080x1440，自动切分） — 主体
@@ -115,27 +140,21 @@ rm "$MARK"
 - 源文件：<如有 HTML 预览文件，写相对路径>
 ```
 
-### 4.5 成本预算检查
+### 4.5 配图清单核对
 
-数 AI 生图张数：
-```bash
-AI_COUNT=1  # 至少包含 cover；如正文概念图走 AI，逐张累加
-BUDGET=${AI_IMAGE_BUDGET_PER_ARTICLE:-1}
-if [ "$AI_COUNT" -gt "$BUDGET" ]; then
-  # 用 AskUserQuestion 让用户确认超额
-fi
-```
+跑完 4.1-4.4 后，列一份 `content-factory/images/<slug>/` 下实际产物清单（封面、正文图 N 张、流程图 K 张、卡组若干），与 4.1 规划做对账。缺图直接补，不要进入 4.5（COS）。
 
 ### 4.6 Stage 4 摘要
 
 输出一行：
 
 ```
-Stage 4 完成。配图成本：
-  HTML 截图 × <N>  [零成本]
-  现成图   × <M>   [零成本]
-  AI 生图  × <K>   [~$<K * 0.04>]
-  总成本 ≈ $<K * 0.04>
+Stage 4 完成。配图全 HTML 路径：
+  封面     × 1   [零成本]
+  正文图   × <N> [零成本]
+  流程图   × <K> [零成本]
+  小红书卡 × <M> [零成本]
+  总成本 = $0
 ```
 
 ---
