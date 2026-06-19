@@ -39,12 +39,13 @@ argument-hint: []
 
 展示 3-4 个候选 + 热度依据，让用户：
 1. 选 1 个候选（或自填新方向）
-2. 确认 task_type：`工具教程` | `知识思辨`
+2. 确认 task_type：`工具短文` | `工具教程` | `知识思辨`  
+   - 开源/GitHub 新品介绍、「X 星的项目」类公众号 → 默认推荐 **工具短文**（模板：`content-factory/_templates/tool-short-article.md`）
 3. 确认目标平台（多选）：`公众号` | `X` | `小红书`
 
 ### 1.5 生成 brief
 
-- 用 `content-factory/_templates/brief.md` 作模板
+- 用 `content-factory/_templates/brief.md` 作模板；若 task_type=`工具短文`，改用 `brief-tool-short.md`
 - 用 §2.3 的 slug 规则生成 slug：`YYYY-MM-DD-<标题关键词>`，去标点、空格转 `-`、最长 40 字符
 - 落盘到 `content-factory/briefs/<slug>.md`，把上面 4 个用户决策填进去
 

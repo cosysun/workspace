@@ -41,7 +41,19 @@ cp content-factory/_templates/audit-checklist.md content-factory/drafts/<slug>/a
 
 ### 3.1 初稿 v1 — 按 task_type 分流
 
-#### 3.1.a 如果 task_type=`工具教程`
+#### 3.1.a 如果 task_type=`工具短文`
+
+**必须先读** `content-factory/_templates/tool-short-article.md`，严格按「四块结构 + 读者三问 + 必须排除」写。
+
+Claude 直接按 brief 大纲写，落 `content-factory/drafts/<slug>/v1-初稿.md`。
+
+**字数目标**：brief 默认 **600–900** 字；解析 `公众号预计字数` 同上。超出 `WORD_HARD_CAP` 优先**删段**（竞品/benchmark/插件章），不要删安装命令块。
+
+**视角**：用户扫读视角——每句只服务「是啥 / 有啥用 / 怎么试」；禁止 README 搬运腔。
+
+**不要**调 `ljg-writes`。
+
+#### 3.1.b 如果 task_type=`工具教程`
 
 Claude 直接按 brief 大纲写说明文，落 `content-factory/drafts/<slug>/v1-初稿.md`。
 
@@ -49,7 +61,7 @@ Claude 直接按 brief 大纲写说明文，落 `content-factory/drafts/<slug>/v
 
 **不要**调 `ljg-writes` —— 文体不匹配，会变成"大朝风格的评测"。
 
-#### 3.1.b 如果 task_type=`知识思辨`
+#### 3.1.c 如果 task_type=`知识思辨`
 
 调 `ljg-writes`（输出到 `~/Documents/notes/{时间戳}__write.md`）。**调用前在 prompt 里把字数范围塞进去**：
 
