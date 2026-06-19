@@ -9,6 +9,25 @@ argument-hint: <slug>
 
 `<slug>` → 读 `content-factory/drafts/<slug>/final-with-urls.md`（图引用已经是 COS URL）。
 
+## Stage 5.0 解析目标平台（强制第一步）
+
+从 `content-factory/briefs/<slug>.md` 解析 `目标平台` 字段，得到三个布尔旗：
+
+```bash
+BRIEF=content-factory/briefs/<slug>.md
+PLATFORMS_LINE=$(grep -E '^- 目标平台' "$BRIEF" || grep -E '目标平台' "$BRIEF" | head -1)
+
+case "$PLATFORMS_LINE" in *公众号*) WANT_WECHAT=1 ;; *) WANT_WECHAT=0 ;; esac
+case "$PLATFORMS_LINE" in *X*)      WANT_X=1      ;; *) WANT_X=0      ;; esac
+case "$PLATFORMS_LINE" in *小红书*) WANT_XHS=1    ;; *) WANT_XHS=0    ;; esac
+
+echo "目标平台：公众号=$WANT_WECHAT X=$WANT_X 小红书=$WANT_XHS"
+```
+
+如果三个都是 0，停下来报错：brief 没填目标平台或解析失败，让用户回头改 brief 或确认。
+
+**这三个旗后面 5.1-5.7 的所有分支都要查；任何分支必须用对应旗短路。**
+
 ## 步骤
 
 ### 5.1 排版预览
@@ -28,6 +47,8 @@ argument-hint: <slug>
 
 #### 5.3.a X 短版
 
+**只在 `WANT_X=1` 时执行**；`WANT_X=0` 跳过本节，不生成 `x-post.md`。
+
 调 `huashu-article-to-x`：
 - 输入 `final-with-urls.md`
 - 压成 200-500 字 X 版本（金句 / 数据 / 价值主张）
@@ -36,16 +57,19 @@ argument-hint: <slug>
 
 #### 5.3.b 小红书
 
+**只在 `WANT_XHS=1` 时处理**；`WANT_XHS=0` 跳过本节。
+
 已有 `content-factory/images/<slug>/cards/` 卡组 + 一句话文案模板，**不需要改写**。
 
 ### 🔴 Gate 3：AskUserQuestion 发布预览
 
-展示给用户：
+展示给用户（**只展示已勾选的平台对应内容**）：
 - baoyu-markdown-to-html 预览 HTML 路径（用户在浏览器里看）
 - 选中的标题
 - 封面 COS URL
 - huashu-video-check 评分 + 建议
-- X 短版预览
+- X 短版预览（仅当 `WANT_X=1`）
+- 小红书卡组目录（仅当 `WANT_XHS=1`）
 
 选项：`发布` / `返回修改`。
 
@@ -53,7 +77,11 @@ argument-hint: <slug>
 
 ### 5.4 发布到各平台（顺序：公众号 → X → 小红书）
 
+**只发 brief 勾选的平台**：每个子节开头检查对应旗（`WANT_WECHAT` / `WANT_X` / `WANT_XHS`），未勾选直接跳过整个子节。
+
 #### 5.4.a 公众号
+
+**前置**：`WANT_WECHAT=1`，否则跳过本节。
 
 调 `baoyu-post-to-wechat`：
 - 输入 `final-with-urls.md`
@@ -63,12 +91,16 @@ argument-hint: <slug>
 
 #### 5.4.b X
 
+**前置**：`WANT_X=1`，否则跳过本节。
+
 调 `baoyu-post-to-x`：
 - 输入 `x-post.md`
 - baoyu 内部会下载 COS 图再上传到 X media
 - 收集：`x_url` + `x_published_at`
 
 #### 5.4.c 小红书（手动）
+
+**前置**：`WANT_XHS=1`，否则跳过本节。
 
 编排打开 `content-factory/images/<slug>/cards/` 目录 + 一句话文案：
 ```bash
